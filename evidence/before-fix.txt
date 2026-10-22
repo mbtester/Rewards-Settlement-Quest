@@ -1,0 +1,144 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.15.0, pytest-9.1.1, pluggy-1.7.0 -- /Users/mukulbhatnagar/Downloads/rewards-settlement-quest/.venv/bin/python3.15
+cachedir: .pytest_cache
+rootdir: /Users/mukulbhatnagar/Downloads/rewards-settlement-quest
+configfile: pytest.ini
+testpaths: tests
+collecting ... collected 15 items
+
+tests/test_settlement.py::test_tc01_happy_path PASSED                    [  6%]
+tests/test_settlement.py::test_tc02_lower_boundary_is_included PASSED    [ 13%]
+tests/test_settlement.py::test_tc03_upper_boundary_excluded_then_paid_next_week PASSED [ 20%]
+tests/test_settlement.py::test_tc04a_ist_timestamp_inside_window_is_paid PASSED [ 26%]
+tests/test_settlement.py::test_tc04b_ist_timestamp_on_utc_boundary_is_excluded PASSED [ 33%]
+tests/test_settlement.py::test_tc05_duplicate_task_id_counted_once PASSED [ 40%]
+tests/test_settlement.py::test_tc09_payout_failure_means_no_notification PASSED [ 46%]
+tests/test_settlement.py::test_tc10_non_completed_tasks_earn_nothing PASSED [ 53%]
+tests/test_settlement.py::test_tc13_naive_timestamp_is_rejected PASSED   [ 60%]
+tests/test_settlement.py::test_tc06_retry_after_notification_failure_pays_once FAILED [ 66%]
+tests/test_settlement.py::test_tc07_rerunning_a_finished_settlement_pays_nothing_new FAILED [ 73%]
+tests/test_settlement.py::test_tc08_notification_failure_does_not_reverse_or_crash FAILED [ 80%]
+tests/test_settlement.py::test_tc11_retry_delivers_missing_notification_without_repaying FAILED [ 86%]
+tests/test_settlement.py::test_tc12_one_users_notify_failure_does_not_block_others FAILED [ 93%]
+tests/test_settlement.py::test_tc14_same_task_id_reappearing_in_next_window XFAIL [100%]
+
+=================================== FAILURES ===================================
+_____________ test_tc06_retry_after_notification_failure_pays_once _____________
+
+impl = <module 'rewards.settlement_faulty' from '/Users/mukulbhatnagar/Downloads/rewards-settlement-quest/src/rewards/settlement_faulty.py'>
+
+    @pytest.mark.regression
+    def test_tc06_retry_after_notification_failure_pays_once(impl):
+        svc, ledger, n = make(impl, notifier=FlakyNotifier(fail_for=["u1"], fail_times=1))
+        run_with_retry(svc, [done("t1", "u1", START + timedelta(days=1))], RUN_AT)
+>       assert ledger.balance("u1") == 10
+E       AssertionError: assert 20 == 10
+E        +  where 20 = balance('u1')
+E        +    where balance = <rewards.common.Ledger object at 0x103d1ce50>.balance
+
+tests/test_settlement.py:115: AssertionError
+__________ test_tc07_rerunning_a_finished_settlement_pays_nothing_new __________
+
+impl = <module 'rewards.settlement_faulty' from '/Users/mukulbhatnagar/Downloads/rewards-settlement-quest/src/rewards/settlement_faulty.py'>
+
+    @pytest.mark.regression
+    def test_tc07_rerunning_a_finished_settlement_pays_nothing_new(impl):
+        svc, ledger, n = make(impl)
+        tasks = [done("t1", "u1", START + timedelta(days=1))]
+        svc.run(tasks, RUN_AT)
+        svc.run(tasks, RUN_AT)
+>       assert ledger.balance("u1") == 10
+E       AssertionError: assert 20 == 10
+E        +  where 20 = balance('u1')
+E        +    where balance = <rewards.common.Ledger object at 0x103d1da50>.balance
+
+tests/test_settlement.py:124: AssertionError
+___________ test_tc08_notification_failure_does_not_reverse_or_crash ___________
+
+impl = <module 'rewards.settlement_faulty' from '/Users/mukulbhatnagar/Downloads/rewards-settlement-quest/src/rewards/settlement_faulty.py'>
+
+    @pytest.mark.regression
+    def test_tc08_notification_failure_does_not_reverse_or_crash(impl):
+        svc, ledger, _ = make(impl, notifier=FlakyNotifier(fail_for=["u1"], fail_times=99))
+>       result = svc.run([done("t1", "u1", START + timedelta(days=1))], RUN_AT)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_settlement.py:131: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/rewards/settlement_faulty.py:15: in run
+    self.notifier.send(user_id, credits)        # BUG 2: failure escapes and aborts the run
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_settlement.FlakyNotifier object at 0x1036d6b70>, user_id = 'u1'
+credits = 10
+
+    def send(self, user_id, credits):
+        if self.remaining.get(user_id, 0) > 0:
+            self.remaining[user_id] -= 1
+>           raise NotificationError("provider timeout")
+E           rewards.common.NotificationError: provider timeout
+
+tests/test_settlement.py:25: NotificationError
+________ test_tc11_retry_delivers_missing_notification_without_repaying ________
+
+impl = <module 'rewards.settlement_faulty' from '/Users/mukulbhatnagar/Downloads/rewards-settlement-quest/src/rewards/settlement_faulty.py'>
+
+    @pytest.mark.regression
+    def test_tc11_retry_delivers_missing_notification_without_repaying(impl):
+        svc, ledger, n = make(impl, notifier=FlakyNotifier(fail_for=["u1"], fail_times=1))
+        tasks = [done("t1", "u1", START + timedelta(days=1))]
+>       svc.run(tasks, RUN_AT)                               # payout ok, notify fails
+        ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_settlement.py:140: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/rewards/settlement_faulty.py:15: in run
+    self.notifier.send(user_id, credits)        # BUG 2: failure escapes and aborts the run
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_settlement.FlakyNotifier object at 0x103d2f070>, user_id = 'u1'
+credits = 10
+
+    def send(self, user_id, credits):
+        if self.remaining.get(user_id, 0) > 0:
+            self.remaining[user_id] -= 1
+>           raise NotificationError("provider timeout")
+E           rewards.common.NotificationError: provider timeout
+
+tests/test_settlement.py:25: NotificationError
+___________ test_tc12_one_users_notify_failure_does_not_block_others ___________
+
+impl = <module 'rewards.settlement_faulty' from '/Users/mukulbhatnagar/Downloads/rewards-settlement-quest/src/rewards/settlement_faulty.py'>
+
+    @pytest.mark.regression
+    def test_tc12_one_users_notify_failure_does_not_block_others(impl):
+        svc, ledger, n = make(impl, notifier=FlakyNotifier(fail_for=["u1"], fail_times=99))
+>       svc.run([done("t1", "u1", START + timedelta(days=1)),
+                 done("t2", "u2", START + timedelta(days=1))], RUN_AT)
+
+tests/test_settlement.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/rewards/settlement_faulty.py:15: in run
+    self.notifier.send(user_id, credits)        # BUG 2: failure escapes and aborts the run
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <test_settlement.FlakyNotifier object at 0x103d2e890>, user_id = 'u1'
+credits = 10
+
+    def send(self, user_id, credits):
+        if self.remaining.get(user_id, 0) > 0:
+            self.remaining[user_id] -= 1
+>           raise NotificationError("provider timeout")
+E           rewards.common.NotificationError: provider timeout
+
+tests/test_settlement.py:25: NotificationError
+=========================== short test summary info ============================
+FAILED tests/test_settlement.py::test_tc06_retry_after_notification_failure_pays_once
+FAILED tests/test_settlement.py::test_tc07_rerunning_a_finished_settlement_pays_nothing_new
+FAILED tests/test_settlement.py::test_tc08_notification_failure_does_not_reverse_or_crash
+FAILED tests/test_settlement.py::test_tc11_retry_delivers_missing_notification_without_repaying
+FAILED tests/test_settlement.py::test_tc12_one_users_notify_failure_does_not_block_others
+==================== 5 failed, 9 passed, 1 xfailed in 0.08s ====================
