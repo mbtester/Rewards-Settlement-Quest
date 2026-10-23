@@ -17,7 +17,7 @@ Out: live systems, concurrency, a real datastore, and account-state or admin-set
 ## Completion criteria
 - [x] before-fix, after-fix and mutation-check outputs saved in `evidence/`
 - [x] defect report and checklist complete
-- [ ] Loom under 5 minutes
+- [x] Loom under 5 minutes
 - [x] every link opened and checked for reviewer access
 
 ---
@@ -56,4 +56,4 @@ Faulty: 9 passed, 5 failed, 1 xfailed. Fixed: 14 passed, 1 xfailed. Mutation che
 - Everything is synthetic; nothing was tested against a live system.
 
 ### Actual effort
-6 hours 12 minutes (in progress)
+6 hours 52 minutes
